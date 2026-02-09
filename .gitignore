@@ -1,0 +1,64 @@
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Excel files (may contain sensitive data)
+*.xlsx
+*.xls
+
+# Configuration files (may contain sensitive data)
+*.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test files
+test_*.py
+
+# Windows specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.map
+*.opt
+*.ncb
+*.plg
+*.pch
+*.res
+*.rc
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# Local development
+local_settings.py
