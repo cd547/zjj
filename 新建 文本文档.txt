@@ -1,0 +1,29 @@
+CPH_QGV_dxdt0_QDGV_0
+CPH_QGV_dxdt0_QDGV_0_DXMainTable
+CPH_QGV_dxdt0_QDGV_0_DXMainTable
+
+python main.py SZQ-2601303P.xlsx config_szq_template.json
+
+/html/body/form/div[2]/div[2]/div/div[6]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[2]/table/tbody/tr/td/table[1]
+/html/body/form/div[2]/div[2]/div/div[6]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[2]/table‘
+
+
+
+/html/body/form/div[2]/div[2]/div/div[6]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[2]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[7]/input
+
+<select name="ctl00$CPH$QGV$dxdt0$TC$QDGV$cell0_11$TC$ui_DDL" id="CPH_QGV_dxdt0_QDGV_0_cell0_11_0_ui_DDL_0">
+											<option selected="selected" value="0">Not Applicable</option>
+											<option value="1">OEM</option>
+											<option value="2">Genuine</option>
+											<option value="3">Compatible </option>
+											<option value="4">Brand as Requested</option>
+											<option value="5">Substitute Brand</option>
+											<option value="6">Mixed</option>
+											<option value="7">Unknown</option>
+
+										</select>
+/html/body/form/div[2]/div[2]/div/div[6]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[2]/table/tbody/tr/td/table[1]/tbody/tr[3]/td[12]
+
+LOCAL BRAND->Compatible
+OEM->OEM
+GENUINE->Genuine
