@@ -189,7 +189,7 @@ class ExcelWebFillerGUI:
         button_frame = tk.Frame(self.main_frame)
         button_frame.pack(fill=tk.X, pady=20)
         
-        # 创建两个按钮
+        # 创建三个按钮
         self.connect_button = tk.Button(button_frame, text="连接网页", command=self.connect_to_webpage, 
                                      font=(self.font[0], self.font[1], "bold"), 
                                      bg="#2196F3", fg="white", 
@@ -201,6 +201,12 @@ class ExcelWebFillerGUI:
                                  bg="#4CAF50", fg="white", 
                                  height=2, width=15, state=tk.DISABLED)
         self.fill_button.pack(side=tk.LEFT, padx=10)
+        
+        self.screenshot_button = tk.Button(button_frame, text="页面截图", command=self.take_screenshot, 
+                                      font=(self.font[0], self.font[1], "bold"), 
+                                      bg="#FF9800", fg="white", 
+                                      height=2, width=15, state=tk.DISABLED)
+        self.screenshot_button.pack(side=tk.LEFT, padx=10)
     
     def create_output_window(self):
         """创建输出窗口"""
@@ -519,6 +525,12 @@ class ExcelWebFillerGUI:
             self.append_output("连接到网页...\n")
             self.append_output(f"使用URL: {url}\n")
             self.automator = WebAutomator(url)
+            
+            # 显示浏览器启动的日志信息
+            if hasattr(self.automator, 'logs') and self.automator.logs:
+                for log in self.automator.logs:
+                    self.append_output(f"{log}\n")
+            
             if not self.automator.is_connected:
                 self.append_output("错误: 网页连接失败，无法继续执行任务\n")
                 messagebox.showerror("错误", "网页连接失败")
@@ -526,9 +538,11 @@ class ExcelWebFillerGUI:
                 return
             self.append_output("网页连接成功\n")
             
-            # 启用填表按钮
+            # 启用填表按钮和截图按钮
             self.fill_button.config(state=tk.NORMAL)
+            self.screenshot_button.config(state=tk.NORMAL)
             self.append_output("现在可以点击'自动填表'按钮开始填表\n")
+            self.append_output("现在可以点击'页面截图'按钮进行截图\n")
             
         except Exception as e:
             self.append_output(f"连接网页时出错: {e}\n")
@@ -545,6 +559,60 @@ class ExcelWebFillerGUI:
         
         # 执行填表命令
         self.execute_fill()
+    
+    def take_screenshot(self):
+        """执行页面截图操作"""
+        try:
+            if not self.automator:
+                self.append_output("错误: 请先连接到网页\n")
+                messagebox.showerror("错误", "请先连接到网页")
+                return
+            
+            self.append_output("开始截图...\n")
+            
+            # 获取可执行文件所在目录
+            import sys
+            import os
+            import datetime
+            
+            if getattr(sys, 'frozen', False):
+                # 程序被打包成可执行文件
+                exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+            else:
+                # 程序未打包
+                exe_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # 创建img目录
+            img_dir = os.path.join(exe_dir, "img")
+            if not os.path.exists(img_dir):
+                try:
+                    os.makedirs(img_dir)
+                except Exception as e:
+                    self.append_output(f"创建img目录失败: {e}\n")
+                    messagebox.showerror("错误", f"创建img目录失败: {e}")
+                    return
+            
+            # 生成截图文件名（基于当前时间）
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_file = os.path.join(img_dir, f"screenshot_{timestamp}.png")
+            
+            # 使用automator进行截图
+            screenshot_path = self.automator.screenshot(screenshot_file)
+            
+            if screenshot_path:
+                self.append_output(f"截图成功！\n")
+                self.append_output(f"截图文件路径: {screenshot_path}\n")
+                messagebox.showinfo("成功", f"截图成功！\n截图文件路径: {screenshot_path}")
+            else:
+                self.append_output("截图失败\n")
+                messagebox.showerror("错误", "截图失败")
+            
+        except Exception as e:
+            self.append_output(f"截图时出错: {e}\n")
+            import traceback
+            traceback_str = traceback.format_exc()
+            self.append_output(traceback_str)
+            messagebox.showerror("错误", f"截图时出错: {e}")
     
     def execute_fill(self):
         """执行填表命令"""
@@ -647,7 +715,11 @@ class ExcelWebFillerGUI:
             # 读取Excel数据
             self.append_output("读取Excel数据...\n")
             reader = ExcelReader(self.excel_file, header_row, start_row, end_row)
-            data = reader.read_data()
+            data, excel_discount = reader.read_data()
+            # 如果Excel中找到discount值，优先使用
+            if excel_discount is not None:
+                discount = excel_discount
+                self.append_output(f"从Excel中找到Discount值: {discount}\n")
             self.append_output(f"Excel数据读取成功，共 {len(data)} 行\n")
             
             # 获取满足条件的表格列表
@@ -706,8 +778,17 @@ class ExcelWebFillerGUI:
                         
                         # 确定使用的值
                         value = None
-                        # 首先检查是否有默认值
-                        if default_value is not None:
+                        # 首先检查是否需要使用Discount值
+                        if default_value == "{{discount}}" or (excel_field == "Discount" and discount is not None):
+                            # 使用从Excel中找到的Discount值
+                            if discount is not None:
+                                value = discount
+                                self.append_output(f"使用Discount值: {value} 填入字段 {excel_field}\n")
+                            else:
+                                self.append_output(f"警告: 配置使用Discount值，但未找到Discount值\n")
+                                continue
+                        # 其次检查是否有默认值
+                        elif default_value is not None:
                             value = default_value
                             self.append_output(f"使用默认值: {value} 填入字段 {excel_field}\n")
                         else:

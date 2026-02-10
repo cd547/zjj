@@ -28,7 +28,7 @@ class ExcelReader:
         """读取Excel文件中的数据
         
         Returns:
-            list: 包含数据的列表，每个元素是一个字典，键为列名，值为单元格值
+            tuple: (data, discount_value)，data是包含数据的列表，discount_value是找到的折扣值
         """
         try:
             # 打开Excel文件
@@ -85,6 +85,40 @@ class ExcelReader:
                 if any(row_data.values()):
                     data.append(row_data)
             
+            # 查找discount值
+            discount_value = None
+            # 从表格的最后一行开始往上查找
+            for row_num in range(max_row, 1, -1):
+                # 检查F列（第6列）的值是否为"Discount  :"
+                f_cell_value = sheet.cell(row=row_num, column=6).value
+                if f_cell_value == "Discount  :":
+                    # 检查H列（第8列）的值是否为百分号的数字
+                    h_cell_value = sheet.cell(row=row_num, column=8).value
+                    if h_cell_value:
+                        # 检查是否为字符串且包含百分号
+                        if isinstance(h_cell_value, str) and "%" in h_cell_value:
+                            try:
+                                # 提取百分号前的数字部分
+                                discount_str = h_cell_value.replace("%", "").strip()
+                                # 转换为浮点数
+                                discount_float = float(discount_str)
+                                # 转换为整数
+                                discount_value = int(discount_float)
+                                print(f"找到Discount值: {discount_value}")
+                                break
+                            except:
+                                # 如果转换失败，继续查找
+                                pass
+                        # 检查是否为数字类型（可能已经是数字格式）
+                        elif isinstance(h_cell_value, (int, float)):
+                            # 检查是否是小于1的小数（可能是百分比的数字表示，如0.16表示16%）
+                            if h_cell_value < 1:
+                                discount_value = int(h_cell_value * 100)
+                            else:
+                                discount_value = int(h_cell_value)
+                            print(f"找到Discount值: {discount_value}")
+                            break
+            
             print(f"成功读取Excel文件: {self.excel_file}")
             print(f"表头行: {self.header_row}")
             print(f"数据开始行: {self.start_row}")
@@ -92,7 +126,7 @@ class ExcelReader:
             print(f"共读取 {len(data)} 行数据")
             print(f"表头字段: {[h for h in headers if h is not None]}")
             
-            return data
+            return data, discount_value
         except Exception as e:
             print(f"读取Excel文件失败: {e}")
-            return []
+            return [], None

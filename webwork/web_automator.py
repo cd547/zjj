@@ -26,7 +26,17 @@ class WebAutomator:
         self.is_connected = False
         self.loop = None
         self.matching_tables = []
+        self.logs = []  # 存储日志信息
         self._connect()
+    
+    def _log(self, message):
+        """记录日志信息
+        
+        Args:
+            message (str): 日志信息
+        """
+        print(message)
+        self.logs.append(message)
     
     def _connect(self):
         """连接到网页"""
@@ -39,10 +49,10 @@ class WebAutomator:
             self.loop.run_until_complete(self._connect_async())
             
         except Exception as e:
-            print(f"连接到网页失败: {e}")
+            self._log(f"连接到网页失败: {e}")
             self.is_connected = False
             # 不清理资源，保持浏览器打开
-            print('保持浏览器打开状态，不清理资源')
+            self._log('保持浏览器打开状态，不清理资源')
     
     async def _connect_async(self):
         """异步连接到网页"""
@@ -50,7 +60,7 @@ class WebAutomator:
             # 启动Playwright
             self.playwright = await async_playwright().start()
             # 启动浏览器（默认使用Chrome）
-            print('正在启动浏览器...')
+            self._log('正在启动浏览器...')
             
             # 尝试使用系统已安装的Chrome浏览器
             chrome_paths = [
@@ -61,7 +71,7 @@ class WebAutomator:
             browser_launched = False
             for chrome_path in chrome_paths:
                 try:
-                    print(f'尝试使用Chrome路径: {chrome_path}')
+                    self._log(f'尝试使用Chrome路径: {chrome_path}')
                     self.browser = await self.playwright.chromium.launch(
                         headless=False,  # 显示浏览器窗口
                         slow_mo=50,  # 减慢操作速度，便于观察（从100ms减少到50ms）
@@ -71,11 +81,11 @@ class WebAutomator:
                     browser_launched = True
                     break
                 except Exception as e:
-                    print(f'使用路径 {chrome_path} 失败: {e}')
+                    self._log(f'使用路径 {chrome_path} 失败: {e}')
             
             # 如果所有路径都失败，使用Playwright默认的浏览器
             if not browser_launched:
-                print('使用系统Chrome失败，尝试使用Playwright默认浏览器...')
+                self._log('使用系统Chrome失败，尝试使用Playwright默认浏览器...')
                 self.browser = await self.playwright.chromium.launch(
                     headless=False,  # 显示浏览器窗口
                     slow_mo=100,  # 减慢操作速度，便于观察
@@ -84,7 +94,7 @@ class WebAutomator:
             # 创建新页面
             self.page = await self.browser.new_page()
             # 导航到目标URL
-            print(f'正在导航到: {self.url}')
+            self._log(f'正在导航到: {self.url}')
             # 减少页面加载等待时间，从'networkidle'改为'load'，这样页面加载完成后就开始操作
             await self.page.goto(self.url, wait_until='load')
             
@@ -127,13 +137,13 @@ class WebAutomator:
             await self._detect_tables()
             
             self.is_connected = True
-            print('连接成功！')
+            self._log('连接成功！')
                 
         except Exception as e:
-            print(f"连接到网页失败: {e}")
+            self._log(f"连接到网页失败: {e}")
             self.is_connected = False
             # 不清理资源，保持浏览器打开
-            print('保持浏览器打开状态，不清理资源')
+            self._log('保持浏览器打开状态，不清理资源')
     
     async def _detect_tables(self):
         """检测满足条件的table元素
@@ -142,11 +152,11 @@ class WebAutomator:
         两个数字保持一致
         """
         try:
-            print('\n开始检测满足条件的table元素...')
+            self._log('\n开始检测满足条件的table元素...')
             
             # 查找所有的table元素
             tables = await self.page.locator('table').all()
-            print(f'找到 {len(tables)} 个table元素')
+            self._log(f'找到 {len(tables)} 个table元素')
             
             # 符合条件的table元素计数
             matching_tables = []
@@ -162,28 +172,53 @@ class WebAutomator:
                     pattern = r'^CPH_QGV_dxdt(\d+)_QDGV_\1_DXMainTable$'
                     if re.match(pattern, table_id):
                         matching_tables.append(table_id)
-                        print(f'找到符合条件的table元素: {table_id}')
+                        self._log(f'找到符合条件的table元素: {table_id}')
             
             # 保存匹配的表格
             self.matching_tables = matching_tables
             
             # 输出结果
-            print(f'\n检测完成！')
-            print(f'共找到 {len(matching_tables)} 个满足条件的table元素')
+            self._log('\n检测完成！')
+            self._log(f'共找到 {len(matching_tables)} 个满足条件的table元素')
             if matching_tables:
-                print('符合条件的table元素id:')
+                self._log('符合条件的table元素id:')
                 for table_id in matching_tables:
-                    print(f'  - {table_id}')
+                    self._log(f'  - {table_id}')
             else:
-                print('未找到符合条件的table元素')
+                self._log('未找到符合条件的table元素')
                 
         except Exception as e:
-            print(f"检测table元素失败: {e}")
+            self._log(f"检测table元素失败: {e}")
     
     def _cleanup(self):
         """清理资源（已禁用）"""
-        print('清理资源功能已禁用，保持浏览器打开')
+        self._log('清理资源功能已禁用，保持浏览器打开')
         # 不清理任何资源，保持浏览器完全打开状态
+    
+    def screenshot(self, file_path):
+        """截图当前页面
+        
+        Args:
+            file_path (str): 截图文件保存路径
+            
+        Returns:
+            str: 截图文件路径，如果失败则返回None
+        """
+        try:
+            if not self.page:
+                self._log("错误: 页面未连接")
+                return None
+            
+            self._log(f"正在截图，保存到: {file_path}")
+            
+            # 使用Playwright的screenshot方法
+            self._run_async(self.page.screenshot(path=file_path, full_page=True))
+            
+            self._log(f"截图成功: {file_path}")
+            return file_path
+        except Exception as e:
+            self._log(f"截图失败: {e}")
+            return None
     
     def _run_async(self, coro):
         """运行异步函数"""
