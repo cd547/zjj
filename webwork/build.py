@@ -18,8 +18,7 @@ def main():
         "gui.py",
         "main.py",
         "excel_reader.py",
-        "web_automator.py",
-        "config_szq_template.json"
+        "web_automator.py"
     ]
     
     for file in required_files:
@@ -37,7 +36,6 @@ def main():
         "--name", "excel_web_filler",
         "--add-data", f"excel_reader.py;.",
         "--add-data", f"web_automator.py;.",
-        "--add-data", f"config_szq_template.json;.",
         "--hidden-import", "playwright",
         "--hidden-import", "openpyxl",
         "gui.py"
@@ -70,9 +68,10 @@ def main():
             print("\n" + "="*60)
             print("使用说明:")
             print("="*60)
-            print("1. 将excel_web_filler.exe和config_szq_template.json复制到同一目录")
-            print("2. 双击excel_web_filler.exe运行")
-            print("3. 在界面中选择Excel文件和配置文件，然后点击'启动'按钮")
+            print("1. 将excel_web_filler.exe复制到目标目录")
+            print("2. 在exe文件所在目录创建cfg文件夹，并在其中放置default.json配置文件")
+            print("3. 双击excel_web_filler.exe运行")
+            print("4. 在界面中选择Excel文件，然后点击'连接网页'按钮")
             print("\n" + "="*60)
             print("打包完成!")
         else:
