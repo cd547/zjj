@@ -25,6 +25,7 @@ class WebAutomator:
         self.page = None
         self.is_connected = False
         self.loop = None
+        self.matching_tables = []
         self._connect()
     
     def _connect(self):
@@ -84,6 +85,10 @@ class WebAutomator:
             print(f'正在导航到: {self.url}')
             # 减少页面加载等待时间，从'networkidle'改为'load'，这样页面加载完成后就开始操作
             await self.page.goto(self.url, wait_until='load')
+            
+            # 检测满足条件的table元素
+            await self._detect_tables()
+            
             self.is_connected = True
             print('连接成功！')
                 
@@ -92,6 +97,51 @@ class WebAutomator:
             self.is_connected = False
             # 不清理资源，保持浏览器打开
             print('保持浏览器打开状态，不清理资源')
+    
+    async def _detect_tables(self):
+        """检测满足条件的table元素
+        
+        查找所有id符合"CPH_QGV_dxdt"+数字+"_QDGV_"+数字+"_DXMainTable"格式的table元素
+        两个数字保持一致
+        """
+        try:
+            print('\n开始检测满足条件的table元素...')
+            
+            # 查找所有的table元素
+            tables = await self.page.locator('table').all()
+            print(f'找到 {len(tables)} 个table元素')
+            
+            # 符合条件的table元素计数
+            matching_tables = []
+            
+            # 遍历所有table元素
+            for i, table in enumerate(tables):
+                # 获取table元素的id
+                table_id = await table.get_attribute('id')
+                
+                if table_id:
+                    # 检查id是否符合格式
+                    import re
+                    pattern = r'^CPH_QGV_dxdt(\d+)_QDGV_\1_DXMainTable$'
+                    if re.match(pattern, table_id):
+                        matching_tables.append(table_id)
+                        print(f'找到符合条件的table元素: {table_id}')
+            
+            # 保存匹配的表格
+            self.matching_tables = matching_tables
+            
+            # 输出结果
+            print(f'\n检测完成！')
+            print(f'共找到 {len(matching_tables)} 个满足条件的table元素')
+            if matching_tables:
+                print('符合条件的table元素id:')
+                for table_id in matching_tables:
+                    print(f'  - {table_id}')
+            else:
+                print('未找到符合条件的table元素')
+                
+        except Exception as e:
+            print(f"检测table元素失败: {e}")
     
     def _cleanup(self):
         """清理资源（已禁用）"""

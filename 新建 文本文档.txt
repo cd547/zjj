@@ -27,3 +27,7 @@ python main.py SZQ-2601303P.xlsx config_szq_template.json
 LOCAL BRAND->Compatible
 OEM->OEM
 GENUINE->Genuine
+
+
+CPH_QGV_dxdt0_QDGV_0_DXMainTable
+CPH_QGV_dxdt1_QDGV_1_DXMainTable

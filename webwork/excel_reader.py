@@ -47,9 +47,35 @@ class ExcelReader:
             # 读取数据
             data = []
             # 确定结束行
-            actual_end_row = self.end_row if self.end_row is not None else max_row
-
+            actual_end_row = self.end_row
             
+            # 如果没有指定end_row，则自动计算
+            if actual_end_row is None:
+                actual_end_row = max_row  # 默认到文件末尾
+                
+                # 从start_row开始检查，找到第一个第一列为空或不是数字的行
+                for row_num in range(self.start_row, max_row + 1):
+                    # 获取第一列（A列）的值
+                    first_cell_value = sheet.cell(row=row_num, column=1).value
+                    
+                    # 检查第一列是否为空或不是数字
+                    if first_cell_value is None:
+                        # 第一列为空，上一行就是end_row
+                        actual_end_row = row_num - 1
+                        break
+                    elif not isinstance(first_cell_value, (int, float)):
+                        # 第一列不是数字，上一行就是end_row
+                        actual_end_row = row_num - 1
+                        break
+                    elif isinstance(first_cell_value, str) and not first_cell_value.strip().isdigit():
+                        # 第一列是字符串但不是数字，上一行就是end_row
+                        actual_end_row = row_num - 1
+                        break
+            
+            # 确保actual_end_row至少为start_row
+            if actual_end_row < self.start_row:
+                actual_end_row = self.start_row
+
             for row in sheet.iter_rows(min_row=self.start_row, max_row=actual_end_row, values_only=True):
                 row_data = {}
                 for i, value in enumerate(row):
