@@ -24,17 +24,18 @@ class WebAutomator:
         self.browser = None
         self.page = None
         self.is_connected = False
+        self.loop = None
         self._connect()
     
     def _connect(self):
         """连接到网页"""
         try:
-            # 创建新的事件循环
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # 创建并保存事件循环
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
             
             # 在事件循环中运行异步连接
-            loop.run_until_complete(self._connect_async())
+            self.loop.run_until_complete(self._connect_async())
             
         except Exception as e:
             print(f"连接到网页失败: {e}")
@@ -100,11 +101,13 @@ class WebAutomator:
     def _run_async(self, coro):
         """运行异步函数"""
         try:
-            # 创建新的事件循环
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            # 运行异步函数
-            return loop.run_until_complete(coro)
+            # 始终使用保存的事件循环来运行异步函数
+            if self.loop is None or self.loop.is_closed():
+                raise Exception("事件循环不存在或已关闭，无法运行异步函数")
+            
+            # 直接使用保存的事件循环，不创建新的事件循环
+            # 这样可以确保Playwright对象（如Locator）始终在同一个事件循环中使用
+            return self.loop.run_until_complete(coro)
         except Exception as e:
             print(f"运行异步函数失败: {e}")
             raise
@@ -170,17 +173,11 @@ class WebAutomator:
                 # 打印构建的选择器，方便调试
                 print(f"构建的选择器: {td_selector}")
                 
-                # 尝试多种定位策略
+                # 尝试多种定位策略（减少策略数量，提高速度）
                 strategies = [
-                    # 1. 优先定位有id属性的单元格，并考虑row_index
+                    # 1. 优先定位有id属性的单元格
                     f"{td_selector}[@id]",
-                    # 2. 排除表头行，并考虑row_index
-                    f"{base_selector}//tr[not(contains(@class, 'header')) and not(contains(@class, 'dxgvHeader'))][position()={row_index + 1}]/td[{column}]",
-                    # 3. 基于row_index的精确行定位
-                    f"{base_selector}//tr[position()={row_index + 3}]/td[{column}]",  # 假设从第3行开始是数据
-                    # 4. 排除可能的空单元格（包含文本或有class的）
-                    f"{td_selector}[text() or @class]",
-                    # 5. 通用定位
+                    # 2. 通用定位
                     td_selector
                 ]
                 
@@ -188,50 +185,31 @@ class WebAutomator:
                 for strategy in strategies:
                     try:
                         locator = self.page.locator(strategy)
-                        count = self._run_async(locator.count())
-                        if count > 0:
-                            print(f"使用表格定位策略: {strategy} (匹配到 {count} 个元素)")
-                            # 打印匹配到的元素信息
-                            print("匹配到的元素信息:")
-                            for i in range(min(count, 5)):  # 最多打印前5个元素
+                        # 直接尝试获取元素，不先调用count()
+                        try:
+                            # 尝试获取第一个元素
+                            first_element = locator.first
+                            # 检查元素是否存在
+                            is_visible = self._run_async(first_element.is_visible())
+                            if is_visible:
+                                print(f"使用表格定位策略: {strategy}")
+                                # 如果匹配到多个元素，根据row_index选择对应的元素
                                 try:
-                                    element = locator.nth(i)
-                                    # 获取元素的基本信息
-                                    element_info = {
-                                        "index": i,
-                                        "is_visible": self._run_async(element.is_visible()),
-                                        "is_enabled": self._run_async(element.is_enabled()),
-                                        "is_editable": self._run_async(element.is_editable()),
-                                        "bounding_box": self._run_async(element.bounding_box())
-                                    }
-                                    print(f"  元素 {i}: {element_info}")
-                                    
-                                    # 获取元素的HTML结构
-                                    html = self._run_async(element.inner_html())
-                                    outer_html = self._run_async(element.outer_html())
-                                    print(f"  元素 {i} 完整HTML: {outer_html}")
-                                    print(f"  元素 {i} 内部HTML: {html}")
-                                    
-                                    # 获取元素的属性
-                                    attrs = self._run_async(element.get_attribute_names())
-                                    attr_info = {}
-                                    for attr in attrs[:10]:  # 最多获取10个属性
-                                        try:
-                                            attr_info[attr] = self._run_async(element.get_attribute(attr))
-                                        except:
-                                            pass
-                                    print(f"  元素 {i} 属性: {attr_info}")
-                                except Exception as e:
-                                    print(f"  元素 {i}: 获取信息失败 - {e}")
-                            # 如果匹配到多个元素，根据row_index选择对应的元素
-                            if count > 1:
-                                if row_index < count:
-                                    print(f"匹配到多个元素，使用第 {row_index + 1} 个元素")
-                                    return locator.nth(row_index)
-                                else:
-                                    print(f"row_index {row_index} 超出元素数量 {count}，使用第一个元素")
+                                    count = self._run_async(locator.count())
+                                    if count > 1:
+                                        if row_index < count:
+                                            print(f"匹配到多个元素，使用第 {row_index + 1} 个元素")
+                                            return locator.nth(row_index)
+                                        else:
+                                            print(f"row_index {row_index} 超出元素数量 {count}，使用第一个元素")
+                                            return locator.first
+                                except:
+                                    # 如果count()失败，直接返回第一个元素
                                     return locator.first
-                            return locator
+                                return locator
+                        except Exception as e:
+                            print(f"策略 {strategy} 获取元素失败: {e}")
+                            continue
                     except Exception as e:
                         print(f"策略 {strategy} 失败: {e}")
                         continue
@@ -259,7 +237,22 @@ class WebAutomator:
         try:
             locator = self._find_element(element_identifier, row_index)
             # 等待元素可见
-            self._run_async(locator.wait_for(state='visible', timeout=10000))
+            self._run_async(locator.wait_for(state='visible', timeout=1000))
+            
+            # 尝试找到内部的input元素
+            input_locator = None
+            try:
+                # 尝试在找到的元素内查找input元素
+                input_locator = locator.locator("input")
+                input_count = self._run_async(input_locator.count())
+                if input_count > 0:
+                    print(f"找到内部input元素，数量: {input_count}")
+                    # 使用内部的input元素
+                    locator = input_locator
+                else:
+                    print("未找到内部input元素，使用原始locator")
+            except Exception as input_find_error:
+                print(f"查找内部input元素失败: {input_find_error}")
             
             # 尝试直接填充值
             try:
@@ -313,34 +306,104 @@ class WebAutomator:
         try:
             locator = self._find_element(element_identifier, row_index)
             # 等待元素可见
-            self._run_async(locator.wait_for(state='visible', timeout=10000))
+            self._run_async(locator.wait_for(state='visible', timeout=100))
+            
+            # 尝试找到内部的select元素
+            select_locator = None
+            try:
+                # 尝试在找到的元素内查找select元素
+                select_locator = locator.locator("select")
+                select_count = self._run_async(select_locator.count())
+                if select_count > 0:
+                    print(f"找到内部select元素，数量: {select_count}")
+                    # 使用内部的select元素
+                    locator = select_locator
+                else:
+                    print("未找到内部select元素，使用原始locator")
+            except Exception as select_find_error:
+                print(f"查找内部select元素失败: {select_find_error}")
             
             # 尝试选择选项
+            # 首先尝试按值选择（从错误信息看这个成功率更高）
             try:
-                # 按可见文本选择
-                self._run_async(locator.select_option(label=str(value)))
-            except:
+                self._run_async(locator.select_option(value=str(value)))
+                print(f"成功选择选项（按值）: {value}")
+                return
+            except Exception as value_error:
+                print(f"按值选择失败: {value_error}")
+                
+                # 尝试按可见文本选择
                 try:
-                    # 按值选择
-                    self._run_async(locator.select_option(value=str(value)))
-                except:
+                    self._run_async(locator.select_option(label=str(value)))
+                    print(f"成功选择选项（按文本）: {value}")
+                    return
+                except Exception as label_error:
+                    print(f"按文本选择失败: {label_error}")
+                    
+                    # 尝试按索引选择
                     try:
-                        # 按索引选择
                         index = int(value)
                         self._run_async(locator.select_option(index=index))
-                    except Exception as select_error:
-                        print(f"直接选择失败: {select_error}")
-                        # 尝试点击下拉框，然后输入选项
+                        print(f"成功选择选项（按索引）: {value}")
+                        return
+                    except Exception as index_error:
+                        print(f"按索引选择失败: {index_error}")
+                        
+                        # 如果所有标准方法都失败，使用点击方式
+                        print("尝试使用点击方式选择选项...")
                         try:
+                            # 点击下拉框展开
                             self._run_async(locator.click())
+                            print("已点击下拉框")
+                            
+                            # 减少等待时间，从1500ms减少到500ms
                             self._run_async(self.page.wait_for_timeout(500))
-                            # 输入选项
-                            self._run_async(self.page.keyboard.type(str(value)))
+                            
+                            # 尝试查找包含目标文本的选项
+                            option_selectors = [
+                                f"option:has-text('{value}')",
+                                f"li:has-text('{value}')",
+                                f"div:has-text('{value}')",
+                                f"span:has-text('{value}')",
+                                f"[role='option']:has-text('{value}')",
+                            ]
+                            
+                            option_found = False
+                            for option_selector in option_selectors:
+                                try:
+                                    option_locator = self.page.locator(option_selector)
+                                    # 等待选项可见
+                                    self._run_async(option_locator.first.wait_for(state='visible', timeout=3000))
+                                    count = self._run_async(option_locator.count())
+                                    if count > 0:
+                                        print(f"找到 {count} 个匹配的选项: {option_selector}")
+                                        # 点击第一个匹配的选项
+                                        self._run_async(option_locator.first.click())
+                                        print(f"成功点击选项: {value}")
+                                        option_found = True
+                                        break
+                                except Exception as option_error:
+                                    print(f"使用选择器 {option_selector} 查找选项失败: {option_error}")
+                                    continue
+                            
+                            if not option_found:
+                                # 如果找不到选项，尝试使用键盘导航
+                                print("未找到选项，尝试使用键盘导航...")
+                                # 按下箭头键展开下拉列表
+                                self._run_async(self.page.keyboard.press("ArrowDown"))
+                                self._run_async(self.page.wait_for_timeout(500))
+                                
+                                # 尝试输入部分文本来过滤选项
+                                self._run_async(self.page.keyboard.type(str(value)))
+                                self._run_async(self.page.wait_for_timeout(800))
+                            
                             # 按Enter确认
                             self._run_async(self.page.keyboard.press("Enter"))
-                            print(f"已点击并输入选项: {value}")
+                            print(f"已使用键盘输入选项: {value}")
+                            
                         except Exception as click_error:
-                            print(f"点击并输入选项失败: {click_error}")
+                            print(f"点击方式选择选项失败: {click_error}")
+                            raise
         except Exception as e:
             print(f"选择下拉框选项时出错: {e}")
             # 出错时不关闭浏览器，继续执行
