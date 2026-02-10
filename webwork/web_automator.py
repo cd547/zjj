@@ -65,7 +65,8 @@ class WebAutomator:
                     self.browser = await self.playwright.chromium.launch(
                         headless=False,  # 显示浏览器窗口
                         slow_mo=50,  # 减慢操作速度，便于观察（从100ms减少到50ms）
-                        executable_path=chrome_path  # 系统Chrome路径
+                        executable_path=chrome_path,  # 系统Chrome路径
+                        args=["--enable-scroll-bars"]  # 强制显示滚动条
                     )
                     browser_launched = True
                     break
@@ -77,7 +78,8 @@ class WebAutomator:
                 print('使用系统Chrome失败，尝试使用Playwright默认浏览器...')
                 self.browser = await self.playwright.chromium.launch(
                     headless=False,  # 显示浏览器窗口
-                    slow_mo=100  # 减慢操作速度，便于观察
+                    slow_mo=100,  # 减慢操作速度，便于观察
+                    args=["--enable-scroll-bars"]  # 强制显示滚动条
                 )
             # 创建新页面
             self.page = await self.browser.new_page()
@@ -85,6 +87,41 @@ class WebAutomator:
             print(f'正在导航到: {self.url}')
             # 减少页面加载等待时间，从'networkidle'改为'load'，这样页面加载完成后就开始操作
             await self.page.goto(self.url, wait_until='load')
+            
+            # 注入CSS以强制显示滚动条
+            await self.page.add_style_tag(content="""
+                /* 强制显示滚动条 */
+                ::-webkit-scrollbar {
+                    width: 12px !important;
+                    height: 12px !important;
+                    display: block !important;
+                }
+                ::-webkit-scrollbar-track {
+                    background: #f1f1f1 !important;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: #888 !important;
+                    border-radius: 6px !important;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: #555 !important;
+                }
+                /* 为body和所有可滚动元素添加滚动条 */
+                body {
+                    overflow: auto !important;
+                    scrollbar-width: auto !important;
+                    -ms-overflow-style: auto !important;
+                }
+                /* 确保所有可滚动容器都显示滚动条 */
+                .scrollable,
+                .overflow-auto,
+                .overflow-x-auto,
+                .overflow-y-auto {
+                    overflow: auto !important;
+                    scrollbar-width: auto !important;
+                    -ms-overflow-style: auto !important;
+                }
+            """)
             
             # 检测满足条件的table元素
             await self._detect_tables()
