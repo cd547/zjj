@@ -1,0 +1,186 @@
+﻿/* begin standard styles */
+
+div, span, img, form, iframe, h1, h2, h3, h4, h5, h6,td, tr, table
+{
+	margin: 0px;
+	padding: 0px;
+	background-color: transparent;
+}
+
+.divPopup{
+    border: 3px solid #6b6a63;
+    width: 350px;
+    height: 150px;
+    border-radius :7px;
+    margin : auto;
+    padding : 20px;
+    position:fixed;
+}
+
+.divPopupAlert{
+    border: 3px solid #6b6a63;
+    width: 350px;
+    height: 110px;
+    border-radius :7px;
+    margin : auto;
+    padding : 20px;
+    position:fixed;
+}
+
+/* end standard styles */
+
+
+/* Text below the Graphics in the Master Header*/
+.HeaderText
+{
+	font-weight: bold;
+	font-size: small;
+	text-transform: capitalize;
+	color: gray;
+	font-family: Verdana;
+}
+
+/* The format of the grids displaying the list of quotations, bookings etc*/
+.ResultTables
+{
+	font-weight: normal;
+	font-size: x-small;
+	text-transform: capitalize;
+	font-family: Verdana;
+	text-align: justify;
+	background-color: #d5e4f2;
+	color: black;
+}
+.ResultTablesAlt
+{
+	font-weight: normal;
+	font-size: x-small;
+	text-transform: capitalize;
+	font-family: Verdana;
+	text-align: justify;
+	background-color: white;
+	color: black;
+}
+.ResultTablesEditMode
+{
+	font-weight: normal;
+	font-size: x-small;
+	text-transform: capitalize;
+	font-family: Verdana;
+	text-align: justify;
+}
+
+.TableHeader
+{
+	/*background-image: url(Images/gradient_DkBlue.jpg);*/
+	background-color: #9ac6ff;
+	font-size: small;
+	font-variant:small-caps;
+	color: White;	
+}
+.TableHeader A:visited
+{
+	color: White;
+}
+.TableHeader A:link
+{
+	color: White;	
+}
+
+/* General formating of the whole page (unless otherwise specified)*/
+BODY
+{
+	/*color: black;*/
+	font-family: Verdana;
+	font-size: x-small;
+	margin: 0px;
+}
+
+/*
+This is the standard class for normal elements in a page
+*/
+.StandardUIElement
+{
+	/*color: black;*/
+	font-family: Verdana;
+	font-size: x-small;
+	/*padding: 0px;*/
+	/*margin: 0px;*/
+
+}
+
+
+
+
+.StandardGroupUIElement
+{
+	color: #3764a0;
+	font-family: Verdana;
+	font-size: x-small;
+	font-weight: bold;
+}
+
+
+.StandardNumericUIElement
+{
+	/*color: black;*/
+	font-family: Verdana;
+	font-size: x-small;	
+	text-align: right;
+}
+.StandardErrorUIElement
+{
+	color: red;
+	font-family: Verdana;
+	font-size: x-small;	
+}
+
+.ReadOnlyUIElement
+{
+	color: gray;
+	font-family: Verdana;
+	font-size: x-small;		
+}
+
+.InfoBoxElement
+{
+	padding-right: 10px;
+	padding-left: 10px;
+	padding-bottom: 5px; 
+	padding-top: 5px;
+	background-color: #d5e4f2;
+	border-color: #b0cbf7;
+	border-style: solid;
+	border-width: 2px;	
+}
+
+.SmallHeaderElement
+{
+	border-bottom: solid 1px #9ac6ff;
+	color: #3764a0;
+	font-weight: bold;
+}
+
+.InfoTextElement
+{
+	color: #3764a0;
+	font-weight: bold;
+}
+
+
+.FilterEditorElement
+{
+	color: black;
+	font-family: Verdana;
+	font-size: x-small;
+	width: 95%;
+	margin-left: 1px;
+	
+}
+
+.FilterHeader
+{
+	color: Red;	
+}
+
+

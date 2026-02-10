@@ -47,8 +47,26 @@ class ExcelWebFillerGUI:
         self.config_file = ""
         self.url = ""
         self.automator = None
-        # 初始化日志文件
-        self.log_file = self._init_log_file()
+        self.log_buffer = []  # 日志缓冲区
+        self.buffer_size = 100  # 缓冲区大小
+        self.last_update_time = 0  # 上次更新时间
+        self.update_interval = 0.5  # 更新间隔（秒）
+        self.log_file = self._init_log_file()  # 初始化日志文件
+    
+    def set_button_states(self, connect_state=None, fill_state=None, screenshot_state=None):
+        """统一设置按钮状态
+        
+        Args:
+            connect_state: 连接按钮状态（None表示不改变）
+            fill_state: 填表按钮状态（None表示不改变）
+            screenshot_state: 截图按钮状态（None表示不改变）
+        """
+        if connect_state is not None:
+            self.connect_button.config(state=connect_state)
+        if fill_state is not None:
+            self.fill_button.config(state=fill_state)
+        if screenshot_state is not None:
+            self.screenshot_button.config(state=screenshot_state)
     
     def _init_log_file(self):
         """初始化日志文件
@@ -421,8 +439,8 @@ class ExcelWebFillerGUI:
         self.output_text.delete(1.0, tk.END)
         self.output_text.config(state=tk.DISABLED)
         
-        # 禁用连接按钮
-        self.connect_button.config(state=tk.DISABLED)
+        # 禁用所有按钮
+        self.set_button_states(connect_state=tk.DISABLED, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
         
         # 执行连接命令
         self.execute_connect()
@@ -459,7 +477,7 @@ class ExcelWebFillerGUI:
                 except Exception as e:
                     self.append_output(f"读取配置文件失败: {e}\n")
                     messagebox.showerror("错误", f"读取配置文件失败: {e}")
-                    self.connect_button.config(state=tk.NORMAL)
+                    self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
                     return
             else:
                 # 用户未指定配置文件，尝试从默认位置读取
@@ -510,7 +528,7 @@ class ExcelWebFillerGUI:
                 if not config_file_found:
                     self.append_output("错误: 未找到配置文件\n")
                     messagebox.showerror("错误", "未找到配置文件，请选择配置文件或在cfg文件夹中放置default.json")
-                    self.connect_button.config(state=tk.NORMAL)
+                    self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
                     return
             
             # 获取URL，优先使用界面输入的URL
@@ -518,7 +536,7 @@ class ExcelWebFillerGUI:
             if not url:
                 self.append_output("警告: 未提供网页URL\n")
                 messagebox.showwarning("警告", "未提供网页URL")
-                self.connect_button.config(state=tk.NORMAL)
+                self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
                 return
             
             # 连接到网页
@@ -534,13 +552,12 @@ class ExcelWebFillerGUI:
             if not self.automator.is_connected:
                 self.append_output("错误: 网页连接失败，无法继续执行任务\n")
                 messagebox.showerror("错误", "网页连接失败")
-                self.connect_button.config(state=tk.NORMAL)
+                self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
                 return
             self.append_output("网页连接成功\n")
             
             # 启用填表按钮和截图按钮
-            self.fill_button.config(state=tk.NORMAL)
-            self.screenshot_button.config(state=tk.NORMAL)
+            self.set_button_states(connect_state=tk.DISABLED, fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
             self.append_output("现在可以点击'自动填表'按钮开始填表\n")
             self.append_output("现在可以点击'页面截图'按钮进行截图\n")
             
@@ -550,12 +567,12 @@ class ExcelWebFillerGUI:
             traceback_str = traceback.format_exc()
             self.append_output(traceback_str)
             messagebox.showerror("错误", f"连接网页时出错: {e}")
-            self.connect_button.config(state=tk.NORMAL)
+            self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
     
     def fill_table(self):
         """执行填表操作"""
-        # 禁用填表按钮
-        self.fill_button.config(state=tk.DISABLED)
+        # 禁用填表按钮和截图按钮
+        self.set_button_states(fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
         
         # 执行填表命令
         self.execute_fill()
@@ -620,7 +637,7 @@ class ExcelWebFillerGUI:
             if not self.automator:
                 self.append_output("错误: 请先连接到网页\n")
                 messagebox.showerror("错误", "请先连接到网页")
-                self.fill_button.config(state=tk.NORMAL)
+                self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
                 return
             
             self.append_output("开始执行填表任务...\n")
@@ -652,7 +669,7 @@ class ExcelWebFillerGUI:
                 except Exception as e:
                     self.append_output(f"读取配置文件失败: {e}\n")
                     messagebox.showerror("错误", f"读取配置文件失败: {e}")
-                    self.fill_button.config(state=tk.NORMAL)
+                    self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
                     return
             else:
                 # 用户未指定配置文件，尝试从默认位置读取
@@ -702,7 +719,7 @@ class ExcelWebFillerGUI:
                 if not config_file_found:
                     self.append_output("错误: 未找到配置文件\n")
                     messagebox.showerror("错误", "未找到配置文件，请选择配置文件或在cfg文件夹中放置default.json")
-                    self.fill_button.config(state=tk.NORMAL)
+                    self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
                     return
             
             # 获取Excel配置
@@ -727,7 +744,7 @@ class ExcelWebFillerGUI:
             if not matching_tables:
                 self.append_output("警告: 未找到满足条件的表格，无法继续执行任务\n")
                 messagebox.showwarning("警告", "未找到满足条件的表格")
-                self.fill_button.config(state=tk.NORMAL)
+                self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
                 return
             
             self.append_output(f"找到 {len(matching_tables)} 个满足条件的表格\n")
@@ -875,6 +892,9 @@ class ExcelWebFillerGUI:
             self.append_output("任务完成！")
             self.append_output("浏览器保持打开状态，您可以继续使用。")
             
+            # 刷新日志缓冲区，确保所有日志都被写入
+            self.flush_log_buffer()
+            
         except Exception as e:
             self.append_output(f"执行填表命令时出错: {e}\n")
             import traceback
@@ -882,26 +902,67 @@ class ExcelWebFillerGUI:
             self.append_output(traceback_str)
             messagebox.showerror("错误", f"执行填表命令时出错: {e}")
         finally:
-            # 启用填表按钮
-            self.fill_button.config(state=tk.NORMAL)
+            # 启用填表按钮和截图按钮
+            self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
     
     def append_output(self, text):
-        """向输出窗口添加文本并写入日志文件"""
+        """向输出窗口添加文本并写入日志文件
+        
+        使用缓冲机制优化性能：
+        - 日志写入：使用缓冲区，批量写入文件
+        - 界面更新：使用时间间隔控制，减少update()调用频率
+        """
+        import time
+        
+        # 添加到日志缓冲区
+        self.log_buffer.append(text)
+        
+        # 检查是否需要刷新缓冲区
+        current_time = time.time()
+        should_flush = False
+        
+        # 条件1：缓冲区达到指定大小
+        if len(self.log_buffer) >= self.buffer_size:
+            should_flush = True
+        # 条件2：距离上次更新超过指定时间间隔
+        elif current_time - self.last_update_time >= self.update_interval:
+            should_flush = True
+        
         # 添加到输出窗口
         self.output_text.config(state=tk.NORMAL)
         self.output_text.insert(tk.END, text)
         self.output_text.see(tk.END)  # 滚动到末尾
         self.output_text.config(state=tk.DISABLED)
-        self.root.update()  # 立即更新界面
         
-        # 写入日志文件
-        if self.log_file:
+        # 控制界面更新频率
+        if should_flush:
+            self.root.update()  # 立即更新界面
+            self.last_update_time = current_time
+            
+            # 写入日志文件（批量写入）
+            if self.log_file and self.log_buffer:
+                try:
+                    with open(self.log_file, 'a', encoding='utf-8') as f:
+                        f.writelines(self.log_buffer)
+                    self.log_buffer.clear()  # 清空缓冲区
+                except Exception as e:
+                    # 日志写入失败时不影响主程序运行
+                    print(f"写入日志文件失败: {e}")
+    
+    def flush_log_buffer(self):
+        """强制刷新日志缓冲区
+        
+        在程序退出或重要操作完成后调用，确保所有日志都被写入
+        """
+        if self.log_file and self.log_buffer:
             try:
+                record_count = len(self.log_buffer)  # 记录清空前的数量
                 with open(self.log_file, 'a', encoding='utf-8') as f:
-                    f.write(text)
+                    f.writelines(self.log_buffer)
+                self.log_buffer.clear()
+                print(f"日志缓冲区已刷新，共写入 {record_count} 条记录")
             except Exception as e:
-                # 日志写入失败时不影响主程序运行
-                print(f"写入日志文件失败: {e}")
+                print(f"刷新日志缓冲区失败: {e}")
 
 def main():
     """主函数"""

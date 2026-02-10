@@ -88,7 +88,7 @@ class WebAutomator:
                 self._log('使用系统Chrome失败，尝试使用Playwright默认浏览器...')
                 self.browser = await self.playwright.chromium.launch(
                     headless=False,  # 显示浏览器窗口
-                    slow_mo=100,  # 减慢操作速度，便于观察
+                    slow_mo=50,  # 减慢操作速度，便于观察
                     args=["--enable-scroll-bars"]  # 强制显示滚动条
                 )
             # 创建新页面
@@ -221,17 +221,44 @@ class WebAutomator:
             return None
     
     def _run_async(self, coro):
-        """运行异步函数"""
+        """运行异步函数
+        
+        如果事件循环不存在或已关闭，会重新创建事件循环
+        """
         try:
-            # 始终使用保存的事件循环来运行异步函数
+            # 检查事件循环状态
             if self.loop is None or self.loop.is_closed():
-                raise Exception("事件循环不存在或已关闭，无法运行异步函数")
+                # 事件循环不存在或已关闭，重新创建
+                print("事件循环不存在或已关闭，正在重新创建...")
+                self._recreate_event_loop()
             
-            # 直接使用保存的事件循环，不创建新的事件循环
-            # 这样可以确保Playwright对象（如Locator）始终在同一个事件循环中使用
+            # 使用保存的事件循环运行异步函数
             return self.loop.run_until_complete(coro)
         except Exception as e:
             print(f"运行异步函数失败: {e}")
+            # 尝试重新创建事件循环并重试
+            try:
+                print("尝试重新创建事件循环并重试...")
+                self._recreate_event_loop()
+                return self.loop.run_until_complete(coro)
+            except Exception as retry_error:
+                print(f"重试失败: {retry_error}")
+                raise
+    
+    def _recreate_event_loop(self):
+        """重新创建事件循环"""
+        try:
+            # 关闭旧的事件循环（如果存在）
+            if self.loop is not None and not self.loop.is_closed():
+                self.loop.close()
+                print("旧事件循环已关闭")
+            
+            # 创建新的事件循环
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            print("新事件循环已创建")
+        except Exception as e:
+            print(f"重新创建事件循环失败: {e}")
             raise
     
     def _find_element(self, element_identifier, row_index=0):
@@ -275,10 +302,15 @@ class WebAutomator:
                 if 'id' in element_identifier:
                     try:
                         locator = self.page.locator(f"#{element_identifier['id']}")
-                        count = self._run_async(locator.count())
-                        if count > 0:
-                            print(f"使用ID定位器: #{element_identifier['id']}")
-                            return locator
+                        # 直接尝试获取元素，不先调用count()
+                        try:
+                            first_element = locator.first
+                            is_visible = self._run_async(first_element.is_visible())
+                            if is_visible:
+                                print(f"使用ID定位器: #{element_identifier['id']}")
+                                return locator
+                        except:
+                            pass
                     except:
                         pass
                 
@@ -317,18 +349,17 @@ class WebAutomator:
                                 print(f"使用表格定位策略: {strategy}")
                                 # 如果匹配到多个元素，根据row_index选择对应的元素
                                 try:
-                                    count = self._run_async(locator.count())
-                                    if count > 1:
-                                        if row_index < count:
+                                    # 只在需要时才调用count()
+                                    if row_index > 0:
+                                        count = self._run_async(locator.count())
+                                        if count > 1 and row_index < count:
                                             print(f"匹配到多个元素，使用第 {row_index + 1} 个元素")
                                             return locator.nth(row_index)
-                                        else:
-                                            print(f"row_index {row_index} 超出元素数量 {count}，使用第一个元素")
-                                            return locator.first
+                                    # 默认返回第一个元素
+                                    return locator.first
                                 except:
                                     # 如果count()失败，直接返回第一个元素
                                     return locator.first
-                                return locator
                         except Exception as e:
                             print(f"策略 {strategy} 获取元素失败: {e}")
                             continue
@@ -366,12 +397,17 @@ class WebAutomator:
             try:
                 # 尝试在找到的元素内查找input元素
                 input_locator = locator.locator("input")
-                input_count = self._run_async(input_locator.count())
-                if input_count > 0:
-                    print(f"找到内部input元素，数量: {input_count}")
-                    # 使用内部的input元素
-                    locator = input_locator
-                else:
+                # 直接尝试获取第一个input元素，不先调用count()
+                try:
+                    first_input = input_locator.first
+                    is_visible = self._run_async(first_input.is_visible())
+                    if is_visible:
+                        print("找到内部input元素")
+                        # 使用内部的input元素
+                        locator = input_locator
+                    else:
+                        print("未找到内部input元素，使用原始locator")
+                except:
                     print("未找到内部input元素，使用原始locator")
             except Exception as input_find_error:
                 print(f"查找内部input元素失败: {input_find_error}")
@@ -405,11 +441,17 @@ class WebAutomator:
                         else:
                             # 尝试查找所有可见的输入框
                             input_locator = self.page.locator("input:visible")
-                            count = self._run_async(input_locator.count())
-                            if count > 0:
-                                self._run_async(input_locator.first.fill(str(value)))
-                                print(f"已找到并填写第一个可见的输入框: {value}")
-                            else:
+                            # 直接尝试获取第一个输入框，不先调用count()
+                            try:
+                                first_input = input_locator.first
+                                is_visible = self._run_async(first_input.is_visible())
+                                if is_visible:
+                                    self._run_async(first_input.fill(str(value)))
+                                    print(f"已找到并填写第一个可见的输入框: {value}")
+                                else:
+                                    print("无法找到可填写的输入框")
+                            except Exception as visible_input_error:
+                                print(f"查找可见输入框失败: {visible_input_error}")
                                 print("无法找到可填写的输入框")
                     except Exception as input_error:
                         print(f"查找输入框失败: {input_error}")
@@ -435,12 +477,17 @@ class WebAutomator:
             try:
                 # 尝试在找到的元素内查找select元素
                 select_locator = locator.locator("select")
-                select_count = self._run_async(select_locator.count())
-                if select_count > 0:
-                    print(f"找到内部select元素，数量: {select_count}")
-                    # 使用内部的select元素
-                    locator = select_locator
-                else:
+                # 直接尝试获取第一个select元素，不先调用count()
+                try:
+                    first_select = select_locator.first
+                    is_visible = self._run_async(first_select.is_visible())
+                    if is_visible:
+                        print("找到内部select元素")
+                        # 使用内部的select元素
+                        locator = select_locator
+                    else:
+                        print("未找到内部select元素，使用原始locator")
+                except:
                     print("未找到内部select元素，使用原始locator")
             except Exception as select_find_error:
                 print(f"查找内部select元素失败: {select_find_error}")
@@ -494,16 +541,20 @@ class WebAutomator:
                             for option_selector in option_selectors:
                                 try:
                                     option_locator = self.page.locator(option_selector)
-                                    # 等待选项可见
-                                    self._run_async(option_locator.first.wait_for(state='visible', timeout=3000))
-                                    count = self._run_async(option_locator.count())
-                                    if count > 0:
-                                        print(f"找到 {count} 个匹配的选项: {option_selector}")
+                                    # 直接尝试获取第一个选项，不先调用count()
+                                    try:
+                                        first_option = option_locator.first
+                                        # 等待选项可见
+                                        self._run_async(first_option.wait_for(state='visible', timeout=3000))
+                                        print(f"找到匹配的选项: {option_selector}")
                                         # 点击第一个匹配的选项
-                                        self._run_async(option_locator.first.click())
+                                        self._run_async(first_option.click())
                                         print(f"成功点击选项: {value}")
                                         option_found = True
                                         break
+                                    except Exception as option_error:
+                                        print(f"使用选择器 {option_selector} 查找选项失败: {option_error}")
+                                        continue
                                 except Exception as option_error:
                                     print(f"使用选择器 {option_selector} 查找选项失败: {option_error}")
                                     continue
