@@ -152,33 +152,76 @@ class WebAutomator:
         两个数字保持一致
         """
         try:
+            import time
+            start_time = time.time()
             self._log('\n开始检测满足条件的table元素...')
             
-            # 查找所有的table元素
-            tables = await self.page.locator('table').all()
-            self._log(f'找到 {len(tables)} 个table元素')
-            
-            # 符合条件的table元素计数
+            # 优化方法：使用更精确的CSS选择器和批处理
             matching_tables = []
             
-            # 遍历所有table元素
-            for i, table in enumerate(tables):
-                # 获取table元素的id
-                table_id = await table.get_attribute('id')
+            # 方法1：使用更精确的CSS选择器（最快）
+            try:
+                # 使用更精确的CSS选择器，直接匹配id格式
+                # 先获取所有可能的候选元素
+                candidate_tables = await self.page.locator('table[id*="CPH_QGV_dxdt"][id*="_QDGV_"][id*="_DXMainTable"]').all()
                 
-                if table_id:
-                    # 检查id是否符合格式
+                if candidate_tables:
+                    self._log(f'使用精确CSS选择器筛选到 {len(candidate_tables)} 个候选table元素')
+                    
+                    # 对候选元素进行批处理
                     import re
                     pattern = r'^CPH_QGV_dxdt(\d+)_QDGV_\1_DXMainTable$'
-                    if re.match(pattern, table_id):
-                        matching_tables.append(table_id)
-                        self._log(f'找到符合条件的table元素: {table_id}')
+                    
+                    # 遍历候选元素
+                    for table in candidate_tables:
+                        # 获取table元素的id
+                        table_id = await table.get_attribute('id')
+                        if table_id:
+                            # 检查id是否符合格式
+                            if re.match(pattern, table_id):
+                                matching_tables.append(table_id)
+                                self._log(f'找到符合条件的table元素: {table_id}')
+            except Exception as css_error:
+                self._log(f'使用CSS选择器失败: {css_error}')
+                # 如果CSS选择器方法失败，回退到优化的原始方法
+                pass
+            
+            # 如果CSS选择器方法没有找到任何元素，使用优化的原始方法
+            if not matching_tables:
+                # 优化：限制一次性获取的元素数量
+                self._log('使用优化的原始方法进行检测...')
+                
+                # 先获取所有table元素的id属性（批处理）
+                table_elements = await self.page.locator('table').all()
+                self._log(f'找到 {len(table_elements)} 个table元素')
+                
+                import re
+                pattern = r'^CPH_QGV_dxdt(\d+)_QDGV_\1_DXMainTable$'
+                
+                # 遍历table元素，使用更高效的方式
+                for i, table in enumerate(table_elements):
+                    try:
+                        # 获取table元素的id
+                        table_id = await table.get_attribute('id')
+                        if table_id:
+                            # 检查id是否符合格式
+                            if re.match(pattern, table_id):
+                                matching_tables.append(table_id)
+                                self._log(f'找到符合条件的table元素: {table_id}')
+                    except Exception as e:
+                        # 单个元素处理失败，继续处理下一个
+                        continue
             
             # 保存匹配的表格
             self.matching_tables = matching_tables
             
+            # 计算耗时
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            
             # 输出结果
             self._log('\n检测完成！')
+            self._log(f'检测耗时: {elapsed_time:.2f} 秒')
             self._log(f'共找到 {len(matching_tables)} 个满足条件的table元素')
             if matching_tables:
                 self._log('符合条件的table元素id:')

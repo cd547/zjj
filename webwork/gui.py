@@ -68,6 +68,54 @@ class ExcelWebFillerGUI:
         if screenshot_state is not None:
             self.screenshot_button.config(state=screenshot_state)
     
+    def _process_url(self, url, config_file):
+        """处理URL，支持相对路径
+        
+        Args:
+            url (str): 原始URL
+            config_file (str): 配置文件路径
+            
+        Returns:
+            str: 处理后的URL
+        """
+        import os
+        
+        # 如果URL是http://或https://开头，直接返回
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+        
+        # 如果URL是file://开头，直接返回
+        if url.startswith('file://'):
+            return url
+        
+        # 如果是绝对路径，转换为file://格式
+        if os.path.isabs(url):
+            # 将Windows路径转换为file://格式
+            # 例如：D:\path\to\file.html -> file:///D:/path/to/file.html
+            file_url = url.replace('\\', '/')
+            if not file_url.startswith('/'):
+                file_url = '/' + file_url
+            return 'file://' + file_url
+        
+        # 如果是相对路径，转换为绝对路径，然后转换为file://格式
+        # 相对于配置文件所在目录
+        if config_file:
+            config_dir = os.path.dirname(os.path.abspath(config_file))
+            abs_path = os.path.abspath(os.path.join(config_dir, url))
+            
+            # 将Windows路径转换为file://格式
+            file_url = abs_path.replace('\\', '/')
+            if not file_url.startswith('/'):
+                file_url = '/' + file_url
+            return 'file://' + file_url
+        
+        # 如果没有配置文件，相对于当前工作目录
+        abs_path = os.path.abspath(url)
+        file_url = abs_path.replace('\\', '/')
+        if not file_url.startswith('/'):
+            file_url = '/' + file_url
+        return 'file://' + file_url
+    
     def _init_log_file(self):
         """初始化日志文件
         
@@ -207,7 +255,7 @@ class ExcelWebFillerGUI:
         button_frame = tk.Frame(self.main_frame)
         button_frame.pack(fill=tk.X, pady=20)
         
-        # 创建三个按钮
+        # 创建四个按钮
         self.connect_button = tk.Button(button_frame, text="连接网页", command=self.connect_to_webpage, 
                                      font=(self.font[0], self.font[1], "bold"), 
                                      bg="#2196F3", fg="white", 
@@ -251,6 +299,48 @@ class ExcelWebFillerGUI:
         if file_path:
             self.excel_var.set(file_path)
             self.excel_file = file_path
+            
+            # 立即验证Excel文件格式
+            self.validate_excel_format(file_path)
+    
+    def validate_excel_format(self, excel_file):
+        """验证Excel文件格式
+        
+        Args:
+            excel_file: Excel文件路径
+        """
+        try:
+            from excel_reader import ExcelReader
+            import traceback
+            
+            self.append_output(f"正在验证Excel文件格式: {excel_file}\n")
+            
+            # 创建ExcelReader实例，使用默认配置
+            reader = ExcelReader(excel_file, header_row=16, start_row=17, end_row=None)
+            
+            # 尝试读取数据（这会触发表头验证）
+            data, discount = reader.read_data()
+            
+            self.append_output("✓ Excel文件格式验证通过\n")
+            self.append_output(f"✓ 共读取 {len(data)} 行数据\n")
+            if discount is not None:
+                self.append_output(f"✓ 找到Discount值: {discount}\n")
+            
+        except ValueError as ve:
+            # 表头验证失败
+            error_msg = f"Excel文件格式验证失败: {ve}\n"
+            self.append_output(error_msg)
+            self.flush_log_buffer()  # 强制刷新日志缓冲区
+            self.root.update()  # 强制更新GUI界面
+            messagebox.showerror("Excel格式验证错误", str(ve))
+        except Exception as e:
+            # 其他错误
+            error_msg = f"验证Excel文件时出错: {e}\n"
+            self.append_output(error_msg)
+            self.append_output(f"错误详情: {traceback.format_exc()}\n")
+            self.flush_log_buffer()  # 强制刷新日志缓冲区
+            self.root.update()  # 强制更新GUI界面
+            messagebox.showerror("错误", f"验证Excel文件时出错: {e}")
     
     def browse_config(self):
         """浏览选择配置文件"""
@@ -539,6 +629,9 @@ class ExcelWebFillerGUI:
                 self.set_button_states(connect_state=tk.NORMAL, fill_state=tk.DISABLED, screenshot_state=tk.DISABLED)
                 return
             
+            # 处理相对路径
+            url = self._process_url(url, self.config_file)
+            
             # 连接到网页
             self.append_output("连接到网页...\n")
             self.append_output(f"使用URL: {url}\n")
@@ -649,6 +742,7 @@ class ExcelWebFillerGUI:
             # 导入json和os
             import json
             import os
+            import traceback
             self.append_output("json模块导入成功\n")
             
             # 加载配置文件
@@ -729,15 +823,35 @@ class ExcelWebFillerGUI:
             end_row = excel_config.get('end_row', None)  # 默认结束行
             discount = excel_config.get('discount', None)  # 折扣值
             
-            # 读取Excel数据
+            # 读取Excel数据（Excel文件已经在导入时验证过，这里直接读取）
             self.append_output("读取Excel数据...\n")
-            reader = ExcelReader(self.excel_file, header_row, start_row, end_row)
-            data, excel_discount = reader.read_data()
-            # 如果Excel中找到discount值，优先使用
-            if excel_discount is not None:
-                discount = excel_discount
-                self.append_output(f"从Excel中找到Discount值: {discount}\n")
-            self.append_output(f"Excel数据读取成功，共 {len(data)} 行\n")
+            try:
+                reader = ExcelReader(self.excel_file, header_row, start_row, end_row)
+                data, excel_discount = reader.read_data()
+                # 如果Excel中找到discount值，优先使用
+                if excel_discount is not None:
+                    discount = excel_discount
+                    self.append_output(f"从Excel中找到Discount值: {discount}\n")
+                self.append_output(f"Excel数据读取成功，共 {len(data)} 行\n")
+            except ValueError as ve:
+                # 处理表头验证错误（虽然导入时已验证，但可能配置不同）
+                error_msg = f"Excel文件验证失败: {ve}\n"
+                self.append_output(error_msg)
+                self.flush_log_buffer()  # 强制刷新日志缓冲区
+                self.root.update()  # 强制更新GUI界面
+                messagebox.showerror("Excel验证错误", str(ve))
+                self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
+                return
+            except Exception as e:
+                # 处理Excel读取错误
+                error_msg = f"读取Excel文件时出错: {e}\n"
+                self.append_output(error_msg)
+                self.append_output(f"错误详情: {traceback.format_exc()}\n")
+                self.flush_log_buffer()  # 强制刷新日志缓冲区
+                self.root.update()  # 强制更新GUI界面
+                messagebox.showerror("错误", f"读取Excel文件时出错: {e}")
+                self.set_button_states(fill_state=tk.NORMAL, screenshot_state=tk.NORMAL)
+                return
             
             # 获取满足条件的表格列表
             matching_tables = self.automator.matching_tables

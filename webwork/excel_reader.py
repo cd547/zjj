@@ -44,6 +44,59 @@ class ExcelReader:
             for cell in sheet[self.header_row]:  # 表头所在行
                 headers.append(cell.value)
             
+            # 验证表头
+            expected_headers = [
+                "No.",
+                "IMPA",
+                "Description",
+                "Remark",
+                "Q'ty",
+                "Unit",
+                "Unit Price   (USD)",
+                "Amount   (USD)",
+                "Brand"
+            ]
+            
+            # 清理实际表头中的空格，以便准确比较
+            cleaned_headers = []
+            for header in headers:
+                if header is not None:
+                    # 替换多个连续空格为单个空格，并去除首尾空格
+                    import re
+                    cleaned = re.sub(r'\s+', ' ', str(header)).strip()
+                    cleaned_headers.append(cleaned)
+                else:
+                    cleaned_headers.append(None)
+            
+            # 清理预期表头中的空格
+            cleaned_expected = []
+            for header in expected_headers:
+                import re
+                cleaned = re.sub(r'\s+', ' ', str(header)).strip()
+                cleaned_expected.append(cleaned)
+            
+            # 验证表头是否一致
+            header_match = True
+            error_message = ""
+            
+            # 检查表头数量
+            if len(cleaned_headers) < len(cleaned_expected):
+                header_match = False
+                error_message = f"表头数量不足，预期 {len(cleaned_expected)} 列，实际只有 {len(cleaned_headers)} 列"
+            else:
+                # 检查每列表头
+                for i, (actual, expected) in enumerate(zip(cleaned_headers, cleaned_expected)):
+                    if actual != expected:
+                        header_match = False
+                        error_message = f"表头第 {i+1} 列不匹配，预期: '{expected}'，实际: '{actual}'"
+                        break
+            
+            # 如果表头验证失败，抛出异常
+            if not header_match:
+                raise ValueError(f"Excel表头验证失败: {error_message}")
+            
+            print("Excel表头验证通过！")
+            
             # 读取数据
             data = []
             # 确定结束行
@@ -127,6 +180,10 @@ class ExcelReader:
             print(f"表头字段: {[h for h in headers if h is not None]}")
             
             return data, discount_value
+        except ValueError as ve:
+            # 表头验证失败，重新抛出异常
+            print(f"Excel表头验证失败: {ve}")
+            raise ve  # 重新抛出ValueError异常
         except Exception as e:
             print(f"读取Excel文件失败: {e}")
             return [], None
